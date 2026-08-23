@@ -1647,10 +1647,7 @@ public boolean onOptionsItemSelected(MenuItem item) {
         return true;
     }
     
-    if (id == R.id.action_build) {
-    showBuildModeDialog();
-    return true;
-}
+    
 
     if (id == R.id.action_search) {
         if (editorSearchManager != null) {
