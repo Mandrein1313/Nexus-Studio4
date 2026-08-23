@@ -1637,23 +1637,19 @@ public boolean onCreateOptionsMenu(Menu menu) {
     return true;
 }
     
-
-  @Override
+@Override
 public boolean onOptionsItemSelected(MenuItem item) {
     int id = item.getItemId();
 
     if (id == R.id.action_build) {
-        startCloudBuildPipeline();
+        showBuildModeDialog();  // ต้องเป็นอันนี้เท่านั้น
         return true;
     }
-    
-    
 
     if (id == R.id.action_search) {
         if (editorSearchManager != null) {
             editorSearchManager.toggle();
         } else if (searchBar != null) {
-            // fallback กรณี manager ยังไม่พร้อม
             searchBar.setVisibility(
                     searchBar.getVisibility() == View.GONE ? View.VISIBLE : View.GONE);
         }
@@ -1662,7 +1658,6 @@ public boolean onOptionsItemSelected(MenuItem item) {
 
     return super.onOptionsItemSelected(item);
 }
-
 private void toggleEditorTheme() {
     if (codeEditor == null) return;
 
