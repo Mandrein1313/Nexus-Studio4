@@ -112,21 +112,20 @@ public class LocalBuildManager {
     }
 
     // -------------------------------------------------------------------------
-    // Compile ด้วย ECJ (ในโปรเซส Nexus — ต้องมี dependency org.eclipse.jdt:ecj)
+    // Compile ด้วย ECJ (รองรับทั้ง BatchCompiler API และ Main instance API)
     // -------------------------------------------------------------------------
     private boolean compileWithEcj(List<File> javaFiles, File androidJar,
                                    File outClassesDir, LogCallback log) {
         try {
-            List<String> args = new ArrayList<>();
-            args.add("-1.8");
-            args.add("-proc:none");
-            args.add("-classpath");
-            args.add(androidJar.getAbsolutePath());
-            args.add("-d");
-            args.add(outClassesDir.getAbsolutePath());
+            // คำสั่งแบบ command line เดียว (ใช้กับ BatchCompiler)
+            StringBuilder cmd = new StringBuilder();
+            cmd.append("-1.8 -proc:none ");
+            cmd.append("-classpath ").append(quote(androidJar.getAbsolutePath())).append(" ");
+            cmd.append("-d ").append(quote(outClassesDir.getAbsolutePath())).append(" ");
             for (File f : javaFiles) {
-                args.add(f.getAbsolutePath());
+                cmd.append(quote(f.getAbsolutePath())).append(" ");
             }
+            String commandLine = cmd.toString().trim();
 
             log.onLog("→ ECJ compile...");
 
@@ -135,22 +134,61 @@ public class LocalBuildManager {
             PrintWriter outPw = new PrintWriter(outSw, true);
             PrintWriter errPw = new PrintWriter(errSw, true);
 
-            // org.eclipse.jdt.internal.compiler.batch.Main.compile(...)
-            Class<?> mainClz = Class.forName("org.eclipse.jdt.internal.compiler.batch.Main");
-            Method compile = mainClz.getMethod(
-                    "compile",
-                    String[].class,
-                    PrintWriter.class,
-                    PrintWriter.class,
-                    Object.class
-            );
-            Object result = compile.invoke(
-                    null,
-                    (Object) args.toArray(new String[0]),
-                    outPw,
-                    errPw,
-                    null
-            );
+            boolean success = false;
+
+            // วิธี 1: BatchCompiler (API ทางการของ ECJ)
+            try {
+                Class<?> batchClz = Class.forName("org.eclipse.jdt.core.compiler.batch.BatchCompiler");
+                // compile(String, PrintWriter, PrintWriter, CompilationProgress)
+                Method m = batchClz.getMethod(
+                        "compile",
+                        String.class,
+                        PrintWriter.class,
+                        PrintWriter.class,
+                        Class.forName("org.eclipse.jdt.core.compiler.CompilationProgress")
+                );
+                Object result = m.invoke(null, commandLine, outPw, errPw, null);
+                success = (result instanceof Boolean) ? (Boolean) result : hasClassFiles(outClassesDir);
+                log.onLog("→ ใช้ BatchCompiler API");
+            } catch (ClassNotFoundException e1) {
+                // วิธี 2: instance Main
+                try {
+                    Class<?> mainClz = Class.forName("org.eclipse.jdt.internal.compiler.batch.Main");
+                    // Main(PrintWriter out, PrintWriter err, boolean systemExit, Map options, CompilationProgress)
+                    Object mainInstance;
+                    try {
+                        mainInstance = mainClz
+                                .getConstructor(PrintWriter.class, PrintWriter.class, boolean.class,
+                                        java.util.Map.class,
+                                        Class.forName("org.eclipse.jdt.core.compiler.CompilationProgress"))
+                                .newInstance(outPw, errPw, false, null, null);
+                    } catch (NoSuchMethodException e) {
+                        // constructor สั้นกว่า
+                        mainInstance = mainClz
+                                .getConstructor(PrintWriter.class, PrintWriter.class, boolean.class)
+                                .newInstance(outPw, errPw, false);
+                    }
+
+                    List<String> argList = new ArrayList<>();
+                    argList.add("-1.8");
+                    argList.add("-proc:none");
+                    argList.add("-classpath");
+                    argList.add(androidJar.getAbsolutePath());
+                    argList.add("-d");
+                    argList.add(outClassesDir.getAbsolutePath());
+                    for (File f : javaFiles) {
+                        argList.add(f.getAbsolutePath());
+                    }
+                    String[] args = argList.toArray(new String[0]);
+
+                    Method compileInst = mainClz.getMethod("compile", String[].class);
+                    Object result = compileInst.invoke(mainInstance, (Object) args);
+                    success = (result instanceof Boolean) ? (Boolean) result : hasClassFiles(outClassesDir);
+                    log.onLog("→ ใช้ Main instance API");
+                } catch (Exception e2) {
+                    throw e2;
+                }
+            }
 
             String outLog = outSw.toString().trim();
             String errLog = errSw.toString().trim();
@@ -165,30 +203,31 @@ public class LocalBuildManager {
                 }
             }
 
-            boolean success;
-            if (result instanceof Boolean) {
-                success = (Boolean) result;
-            } else {
-                // บางเวอร์ชันคืน void — ดูว่ามี .class หรือไม่
-                success = hasClassFiles(outClassesDir);
-            }
-
-            if (!success && !hasClassFiles(outClassesDir)) {
-                log.onLog("✗ ECJ รายงานว่า compile ไม่สำเร็จ");
-                return false;
-            }
             if (!hasClassFiles(outClassesDir)) {
                 log.onLog("✗ ไม่พบไฟล์ .class หลัง compile");
                 return false;
             }
-            return true;
+            if (!success) {
+                log.onLog("⚠️ ECJ คืนค่าไม่สำเร็จ แต่มี .class — ถือว่าผ่านบางส่วน");
+            }
+            return hasClassFiles(outClassesDir);
         } catch (ClassNotFoundException e) {
-            log.onLog("✗ ไม่พบ ECJ ในแอป — เพิ่ม implementation 'org.eclipse.jdt:ecj:3.37.0' แล้ว build Nexus ใหม่");
+            log.onLog("✗ ไม่พบ ECJ ในแอป");
+            log.onLog("  เพิ่ม implementation 'org.eclipse.jdt:ecj:3.37.0' ใน app/build.gradle");
+            log.onLog("  แล้ว Cloud Build + ติดตั้ง Nexus ใหม่");
             return false;
         } catch (Exception e) {
-            log.onLog("✗ ECJ error: " + e.getMessage());
+            Throwable c = e.getCause() != null ? e.getCause() : e;
+            log.onLog("✗ ECJ error: " + c.getClass().getSimpleName() + ": " + c.getMessage());
             return false;
         }
+    }
+
+    private static String quote(String path) {
+        if (path.indexOf(' ') >= 0) {
+            return "\"" + path + "\"";
+        }
+        return path;
     }
 
     // -------------------------------------------------------------------------
