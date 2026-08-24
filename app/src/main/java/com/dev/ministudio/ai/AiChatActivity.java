@@ -275,7 +275,6 @@ public class AiChatActivity extends AppCompatActivity {
             String code = m.group(2) != null ? m.group(2) : "";
             if (code.endsWith("\n")) code = code.substring(0, code.length() - 1);
 
-            // Base64 — ไม่พังจาก ' " \n ในโค้ด
             String b64 = Base64.encodeToString(
                     code.getBytes(StandardCharsets.UTF_8),
                     Base64.NO_WRAP);
@@ -301,9 +300,9 @@ public class AiChatActivity extends AppCompatActivity {
                     .append("</div></div>");
 
             out.append("<pre style='margin:0;padding:12px;overflow-x:auto;")
-                    .append("font-family:monospace;font-size:13px;line-height:1.5;")
+                    .append("font-family:monospace;font-size:13px;line-height:1.55;")
                     .append("color:#C0CAF5;white-space:pre;'>")
-                    .append(escapeHtml(code))
+                    .append(highlightCode(code, lang))
                     .append("</pre></div>");
 
             last = m.end();
@@ -316,6 +315,74 @@ public class AiChatActivity extends AppCompatActivity {
             return escapeHtml(text).replace("\n", "<br>");
         }
         return out.toString();
+    }
+
+    /** Syntax highlight แบบง่าย (Tokyo Night) */
+    private String highlightCode(String code, String lang) {
+        if (code == null || code.isEmpty()) return "";
+
+        String l = lang == null ? "" : lang.toLowerCase(Locale.US);
+        String escaped = escapeHtml(code);
+
+        final String KW = "<span style='color:#BB9AF7'>";
+        final String TYP = "<span style='color:#7AA2F7'>";
+        final String STR = "<span style='color:#9ECE6A'>";
+        final String CM = "<span style='color:#565F89'>";
+        final String NUM = "<span style='color:#FF9E64'>";
+        final String ANN = "<span style='color:#E0AF68'>";
+        final String END = "</span>";
+
+        // string
+        escaped = escaped.replaceAll(
+                "(&quot;.*?&quot;|&#39;.*?&#39;)",
+                STR + "$1" + END);
+
+        // comment
+        if (l.contains("xml") || l.contains("html")) {
+            escaped = escaped.replaceAll("(&lt;!--[\\s\\S]*?--&gt;)", CM + "$1" + END);
+        } else {
+            escaped = escaped.replaceAll("(//[^\\n]*)", CM + "$1" + END);
+            escaped = escaped.replaceAll("(/\\*[\\s\\S]*?\\*/)", CM + "$1" + END);
+        }
+
+        // number
+        escaped = escaped.replaceAll("\\b(\\d+\\.?\\d*[fFdDlL]?)\\b", NUM + "$1" + END);
+
+        // annotation
+        escaped = escaped.replaceAll("(@[A-Za-z_][A-Za-z0-9_]*)", ANN + "$1" + END);
+
+        String keywords;
+        if (l.contains("xml") || l.contains("html")) {
+            escaped = escaped.replaceAll(
+                    "&lt;(/?)([a-zA-Z][a-zA-Z0-9_.]*)",
+                    "&lt;$1" + TYP + "$2" + END);
+            escaped = escaped.replaceAll(
+                    "\\b(android:[a-zA-Z0-9_]+|app:[a-zA-Z0-9_]+)\\b",
+                    KW + "$1" + END);
+            keywords = "true|false|match_parent|wrap_content|fill_parent";
+        } else if (l.contains("kt") || l.contains("kotlin")) {
+            keywords = "package|import|class|object|interface|fun|val|var|if|else|when|"
+                    + "for|while|return|null|true|false|is|in|as|this|super|"
+                    + "override|private|public|internal|protected|data|sealed|"
+                    + "companion|init|try|catch|finally|throw|by|lateinit|const";
+        } else {
+            keywords = "package|import|class|interface|enum|extends|implements|"
+                    + "public|private|protected|static|final|abstract|void|return|"
+                    + "if|else|for|while|do|switch|case|break|continue|new|this|super|"
+                    + "try|catch|finally|throw|throws|boolean|int|long|float|double|"
+                    + "char|byte|short|null|true|false|instanceof|synchronized|"
+                    + "volatile|transient|native|strictfp|assert|default";
+        }
+
+        escaped = escaped.replaceAll("\\b(" + keywords + ")\\b", KW + "$1" + END);
+
+        if (!l.contains("xml") && !l.contains("html")) {
+            escaped = escaped.replaceAll(
+                    "\\b([A-Z][A-Za-z0-9_]*)\\b",
+                    TYP + "$1" + END);
+        }
+
+        return escaped;
     }
 
     private void reloadChat() {
