@@ -749,19 +749,25 @@ public void setEditorActiveState(boolean active) {
             codeEditor.setEditable(active);
         } catch (Exception ignored) {
         }
+        codeEditor.setVisibility(active ? View.VISIBLE : View.GONE);
     }
 
-    // หาปุ่มจาก layout ทีละครั้ง (ไม่ใช้ตัวแปร local ของ initViews)
+    if (emptyStateView != null) {
+        emptyStateView.setVisibility(active ? View.GONE : View.VISIBLE);
+    }
+
     setViewEnabled(findViewById(R.id.btnUndo), active);
     setViewEnabled(findViewById(R.id.btnRedo), active);
     setViewEnabled(findViewById(R.id.btnColorPicker), active);
     setViewEnabled(findViewById(R.id.btnFileSearch), active);
     setViewEnabled(findViewById(R.id.btnGitPush), active);
     setViewEnabled(findViewById(R.id.btnPreview), active);
+}
 
-    if (tvSaveStatus != null && !active) {
-        // ไม่บังคับเคลียร์ ถ้าอยากเก็บข้อความ Saved ไว้ ลบบรรทัดนี้ได้
-        // tvSaveStatus.setText("");
+private void setViewEnabled(View v, boolean enabled) {
+    if (v != null) {
+        v.setEnabled(enabled);
+        v.setAlpha(enabled ? 1f : 0.4f);
     }
 }
 
@@ -1179,30 +1185,60 @@ private void toggleXmlPreview() {
     }
 
 public void openFile(File file) {
-    if (file == null) return;
+    if (file == null || !file.exists() || !file.isFile()) return;
 
-    // 1. สั่งเปิดไฟล์ผ่าน Manager ก่อน
-    if (projectTreeManager != null) {
-        projectTreeManager.openFile(file);
+    // 1. อ่านเนื้อหาไฟล์
+    final String content = readFileContent(file);
+
+    // 2. อัปเดตโมเดล / แท็บ
+    if (currentProject != null) {
+        currentProject.setCurrentOpenFile(file);
+        currentProject.addFileToTabs(file); // ถ้ามีเมธอดนี้ ถ้าไม่มีให้จัดการใน ProjectTreeManager
     }
 
-    // 2. บังคับอัปเดต UI ทันทีโดยไม่ต้องรอ Callback ที่อาจช้า
-    updateFilePathStatus(file);
-    
-    // 3. สั่งให้ Editor พร้อมทำงานและ Visible ทันที
+    if (projectTreeManager != null) {
+        try {
+            projectTreeManager.openFile(file);
+        } catch (Exception ignored) {
+        }
+    }
+
+    // 3. อัปเดต UI บน main thread
     runOnUiThread(() -> {
         if (codeEditor != null) {
-            // ดึงไฟล์มาโชว์ใน editor (ถ้าคลาส projectTreeManager ไม่ได้ทำไว้)
-            // ตัวอย่างเช่น: codeEditor.setText(FileUtils.read(file));
-            
-            if (codeEditor.getVisibility() != View.VISIBLE) {
-                setEditorActiveState(true);
-            }
+            codeEditor.setText(content != null ? content : "");
+        }
+
+        updateFilePathStatus(file);
+
+        setEditorActiveState(true); // ซ่อน emptyState + โชว์ editor
+
+        if (tabAdapter != null) {
+            tabAdapter.notifyDataSetChanged();
+        }
+
+        if (tvSaveStatus != null) {
+            tvSaveStatus.setText("Saved");
+            tvSaveStatus.setTextColor(android.graphics.Color.parseColor("#9ECE6A"));
         }
     });
 }
 
-
+private String readFileContent(File file) {
+    StringBuilder sb = new StringBuilder();
+    try (BufferedReader br = new BufferedReader(
+            new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
+        String line;
+        while ((line = br.readLine()) != null) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(line);
+        }
+    } catch (Exception e) {
+        runOnUiThread(() -> showToast("อ่านไฟล์ไม่สำเร็จ: " + e.getMessage()));
+        return "";
+    }
+    return sb.toString();
+}
     public void saveFile() {
         if (projectTreeManager != null) {
             projectTreeManager.saveFile();
