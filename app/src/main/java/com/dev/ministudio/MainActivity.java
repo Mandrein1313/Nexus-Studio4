@@ -1705,7 +1705,7 @@ public boolean onOptionsItemSelected(MenuItem item) {
     int id = item.getItemId();
 
     if (id == R.id.action_build) {
-        showBuildModeDialog();  // ต้องเป็นอันนี้เท่านั้น
+        startCloudBuildPipeline();
         return true;
     }
 
@@ -1720,7 +1720,7 @@ public boolean onOptionsItemSelected(MenuItem item) {
     }
 
     return super.onOptionsItemSelected(item);
-}
+}}
 private void toggleEditorTheme() {
     if (codeEditor == null) return;
 
