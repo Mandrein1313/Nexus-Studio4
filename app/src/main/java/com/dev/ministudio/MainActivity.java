@@ -745,26 +745,30 @@ private void updateLogcatButtonUi(TextView btnLogcat) {
 public void setEditorActiveState(boolean active) {
     if (codeEditor != null) {
         codeEditor.setEnabled(active);
-        codeEditor.setEditable(active);
-        if (!active) {
-            // ยังไม่เปิดไฟล์ — เคลียร์หรือแสดง placeholder ตามที่เคยทำ
-            // codeEditor.setText("");  // ถ้าต้องการเคลียร์ตอนปิด
+        try {
+            codeEditor.setEditable(active);
+        } catch (Exception ignored) {
         }
     }
 
-    // ปุ่ม shortcut ด้านล่าง (ถ้ามี)
-    if (btnUndo != null) btnUndo.setEnabled(active);
-    if (btnRedo != null) btnRedo.setEnabled(active);
-    if (btnColorPicker != null) btnColorPicker.setEnabled(active);
-    if (btnFileSearch != null) btnFileSearch.setEnabled(active);
-    if (btnGitPush != null) btnGitPush.setEnabled(active);
-    if (btnPreview != null) btnPreview.setEnabled(active);
+    // หาปุ่มจาก layout ทีละครั้ง (ไม่ใช้ตัวแปร local ของ initViews)
+    setViewEnabled(findViewById(R.id.btnUndo), active);
+    setViewEnabled(findViewById(R.id.btnRedo), active);
+    setViewEnabled(findViewById(R.id.btnColorPicker), active);
+    setViewEnabled(findViewById(R.id.btnFileSearch), active);
+    setViewEnabled(findViewById(R.id.btnGitPush), active);
+    setViewEnabled(findViewById(R.id.btnPreview), active);
 
-    // แถบสถานะ / ชื่อไฟล์ (ปรับตาม id จริงในโปรเจกต์)
-    if (tvSaveStatus != null) {
-        if (!active) {
-            tvSaveStatus.setText("");
-        }
+    if (tvSaveStatus != null && !active) {
+        // ไม่บังคับเคลียร์ ถ้าอยากเก็บข้อความ Saved ไว้ ลบบรรทัดนี้ได้
+        // tvSaveStatus.setText("");
+    }
+}
+
+private void setViewEnabled(View v, boolean enabled) {
+    if (v != null) {
+        v.setEnabled(enabled);
+        v.setAlpha(enabled ? 1f : 0.4f);
     }
 }
     // 🌟 ระบบตรวจจับสกัดกั้นและแก้บั๊กอัจฉริยะ (AI Error Fixer Pipeline) สำหรับระบบที่ 1 ตัวใหม่ล่าสุดครับท่าน
