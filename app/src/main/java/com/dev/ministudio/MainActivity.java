@@ -1720,7 +1720,7 @@ public boolean onOptionsItemSelected(MenuItem item) {
     }
 
     return super.onOptionsItemSelected(item);
-}}
+}
 private void toggleEditorTheme() {
     if (codeEditor == null) return;
 
