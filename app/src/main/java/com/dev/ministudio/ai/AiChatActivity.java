@@ -5,6 +5,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.util.Base64;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.EditText;
@@ -16,6 +17,7 @@ import androidx.core.view.WindowCompat;
 
 import com.dev.ministudio.R;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 public class AiChatActivity extends AppCompatActivity {
@@ -273,30 +275,26 @@ public class AiChatActivity extends AppCompatActivity {
             String code = m.group(2) != null ? m.group(2) : "";
             if (code.endsWith("\n")) code = code.substring(0, code.length() - 1);
 
-            String safeForJs = code
-                    .replace("\\", "\\\\")
-                    .replace("'", "\\'")
-                    .replace("\"", "\\\"")
-                    .replace("\n", "\\n")
-                    .replace("\r", "");
+            // Base64 — ไม่พังจาก ' " \n ในโค้ด
+            String b64 = Base64.encodeToString(
+                    code.getBytes(StandardCharsets.UTF_8),
+                    Base64.NO_WRAP);
 
             out.append("<div style='margin:10px 0;background:#1A1B26;border:1px solid #3B4261;")
                     .append("border-radius:10px;overflow:hidden;'>");
 
-            // หัวกล่อง: ภาษา + Copy + ใส่ Editor
             out.append("<div style='display:flex;justify-content:space-between;align-items:center;")
                     .append("padding:6px 10px;background:#16161E;border-bottom:1px solid #3B4261;'>")
                     .append("<span style='color:#7AA2F7;font-size:12px;'>")
                     .append(escapeHtml(lang.isEmpty() ? "code" : lang))
-                    .append("</span>")
-                    .append("<div>")
-                    .append("<button type='button' onclick=\"NexusAI.copyText('")
-                    .append(safeForJs)
+                    .append("</span><div>")
+                    .append("<button type='button' onclick=\"NexusAI.copyTextBase64('")
+                    .append(b64)
                     .append("')\" style='background:#3B4261;color:#C0CAF5;border:none;")
                     .append("border-radius:6px;padding:4px 10px;font-size:12px;margin-right:6px;'>")
                     .append("Copy</button>")
-                    .append("<button type='button' onclick=\"NexusAI.insertIntoEditor('")
-                    .append(safeForJs)
+                    .append("<button type='button' onclick=\"NexusAI.insertIntoEditorBase64('")
+                    .append(b64)
                     .append("')\" style='background:#7C3AED;color:#fff;border:none;")
                     .append("border-radius:6px;padding:4px 10px;font-size:12px;'>")
                     .append("ใส่ Editor</button>")
@@ -340,9 +338,9 @@ public class AiChatActivity extends AppCompatActivity {
     public class AiBridge {
 
         @android.webkit.JavascriptInterface
-        public void copyText(String text) {
+        public void copyTextBase64(String b64) {
             runOnUiThread(() -> {
-                String decoded = decodeJsString(text);
+                String decoded = decodeBase64(b64);
                 android.content.ClipboardManager cm =
                         (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                 if (cm != null) {
@@ -353,9 +351,9 @@ public class AiChatActivity extends AppCompatActivity {
         }
 
         @android.webkit.JavascriptInterface
-        public void insertIntoEditor(String text) {
+        public void insertIntoEditorBase64(String b64) {
             runOnUiThread(() -> {
-                String decoded = decodeJsString(text);
+                String decoded = decodeBase64(b64);
                 android.content.Intent data = new android.content.Intent();
                 data.putExtra("ai_insert_code", decoded);
                 setResult(RESULT_OK, data);
@@ -364,14 +362,13 @@ public class AiChatActivity extends AppCompatActivity {
             });
         }
 
-        private String decodeJsString(String text) {
-            if (text == null) return "";
-            return text
-                    .replace("\\n", "\n")
-                    .replace("\\t", "\t")
-                    .replace("\\'", "'")
-                    .replace("\\\"", "\"")
-                    .replace("\\\\", "\\");
+        private String decodeBase64(String b64) {
+            try {
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                return new String(bytes, StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                return "";
+            }
         }
     }
 
