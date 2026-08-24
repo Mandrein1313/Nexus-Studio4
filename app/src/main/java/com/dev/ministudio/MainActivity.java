@@ -771,12 +771,7 @@ private void setViewEnabled(View v, boolean enabled) {
     }
 }
 
-private void setViewEnabled(View v, boolean enabled) {
-    if (v != null) {
-        v.setEnabled(enabled);
-        v.setAlpha(enabled ? 1f : 0.4f);
-    }
-}
+
     // 🌟 ระบบตรวจจับสกัดกั้นและแก้บั๊กอัจฉริยะ (AI Error Fixer Pipeline) สำหรับระบบที่ 1 ตัวใหม่ล่าสุดครับท่าน
  public void triggerAiErrorFixerPipeline() {
     if (codeEditor == null || currentProject == null) {
