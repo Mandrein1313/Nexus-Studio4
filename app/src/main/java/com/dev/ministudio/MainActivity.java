@@ -741,6 +741,32 @@ private void updateLogcatButtonUi(TextView btnLogcat) {
 
     startActivityForResult(intent, REQUEST_AI_CHAT);
 }
+/** เปิด/ปิดสถานะ Editor หลังเปิดไฟล์หรือปิดแท็บ */
+public void setEditorActiveState(boolean active) {
+    if (codeEditor != null) {
+        codeEditor.setEnabled(active);
+        codeEditor.setEditable(active);
+        if (!active) {
+            // ยังไม่เปิดไฟล์ — เคลียร์หรือแสดง placeholder ตามที่เคยทำ
+            // codeEditor.setText("");  // ถ้าต้องการเคลียร์ตอนปิด
+        }
+    }
+
+    // ปุ่ม shortcut ด้านล่าง (ถ้ามี)
+    if (btnUndo != null) btnUndo.setEnabled(active);
+    if (btnRedo != null) btnRedo.setEnabled(active);
+    if (btnColorPicker != null) btnColorPicker.setEnabled(active);
+    if (btnFileSearch != null) btnFileSearch.setEnabled(active);
+    if (btnGitPush != null) btnGitPush.setEnabled(active);
+    if (btnPreview != null) btnPreview.setEnabled(active);
+
+    // แถบสถานะ / ชื่อไฟล์ (ปรับตาม id จริงในโปรเจกต์)
+    if (tvSaveStatus != null) {
+        if (!active) {
+            tvSaveStatus.setText("");
+        }
+    }
+}
     // 🌟 ระบบตรวจจับสกัดกั้นและแก้บั๊กอัจฉริยะ (AI Error Fixer Pipeline) สำหรับระบบที่ 1 ตัวใหม่ล่าสุดครับท่าน
  public void triggerAiErrorFixerPipeline() {
     if (codeEditor == null || currentProject == null) {
