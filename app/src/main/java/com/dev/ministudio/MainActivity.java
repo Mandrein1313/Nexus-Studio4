@@ -121,6 +121,7 @@ public class MainActivity extends AppCompatActivity {
    // เพิ่มตัวแปรนี้ในส่วนขอบเขตของคลาส MainActivity
     private LogcatReader logcatReader;
     private LocalBuildManager localBuildManager;
+    private static final int REQUEST_AI_CHAT = 9101;
     
 
    
@@ -714,10 +715,11 @@ private void updateLogcatButtonUi(TextView btnLogcat) {
         }, 300);
     }
     private void openAiChat() {
-    Intent intent = new Intent(this, AiChatActivity.class);
+    Intent intent = new Intent(this, com.dev.ministudio.ai.AiChatActivity.class);
 
     if (currentProject != null) {
-        intent.putExtra(AiChatActivity.EXTRA_PROJECT_NAME, currentProject.getProjectName());
+        intent.putExtra(com.dev.ministudio.ai.AiChatActivity.EXTRA_PROJECT_NAME,
+                currentProject.getProjectName());
     }
 
     // ส่งโค้ดที่เลือกอยู่ (ถ้ามี)
@@ -731,13 +733,13 @@ private void updateLogcatButtonUi(TextView btnLogcat) {
                             codeEditor.getCursor().getRightColumn()
                     ).toString();
             if (selected != null && !selected.trim().isEmpty()) {
-                intent.putExtra(AiChatActivity.EXTRA_CODE_SNIPPET, selected);
+                intent.putExtra(com.dev.ministudio.ai.AiChatActivity.EXTRA_CODE_SNIPPET, selected);
             }
         } catch (Exception ignored) {
         }
     }
 
-    startActivity(intent);
+    startActivityForResult(intent, REQUEST_AI_CHAT);
 }
     // 🌟 ระบบตรวจจับสกัดกั้นและแก้บั๊กอัจฉริยะ (AI Error Fixer Pipeline) สำหรับระบบที่ 1 ตัวใหม่ล่าสุดครับท่าน
  public void triggerAiErrorFixerPipeline() {
@@ -2154,29 +2156,34 @@ private boolean deleteRecursive(java.io.File fileOrDir) {
     public Handler getAutoSaveHandler() { return autoSaveHandler; }
     public Runnable getSaveRunnable() { return saveRunnable; }
     public PanelPagerAdapter getDialogPanelAdapter() { return dialogPanelAdapter; }
-
+        
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 2026 && projectTreeManager != null) {
-            projectTreeManager.onActivityResult(requestCode, resultCode, data);
+protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+    super.onActivityResult(requestCode, resultCode, data);
+
+    if (requestCode == 2026 && projectTreeManager != null) {
+        projectTreeManager.onActivityResult(requestCode, resultCode, data);
+    }
+
+    if (requestCode == REQUEST_AI_CHAT && resultCode == RESULT_OK && data != null) {
+        String code = data.getStringExtra("ai_insert_code");
+        if (code != null && !code.isEmpty() && codeEditor != null) {
+            try {
+                if (codeEditor.getCursor() != null) {
+                    int line = codeEditor.getCursor().getLeftLine();
+                    int col = codeEditor.getCursor().getLeftColumn();
+                    codeEditor.getText().insert(line, col, code);
+                } else {
+                    codeEditor.setText(code);
+                }
+            } catch (Exception e) {
+                codeEditor.setText(code);
+            }
+            setEditorActiveState(true);
+            showToast("✨ ใส่โค้ดจาก AI แล้ว");
         }
     }
-
-    public void setEditorActiveState(boolean isFileActive) {
-        runOnUiThread(() -> {
-            if (emptyStateView == null || codeEditor == null) return;
-            if (isFileActive) {
-                emptyStateView.setVisibility(View.GONE);
-                codeEditor.setVisibility(View.VISIBLE);
-            } else {
-                codeEditor.setVisibility(View.GONE);
-                emptyStateView.setVisibility(View.VISIBLE);
-                if (tvFilePath != null) tvFilePath.setText("No file open");
-            }
-        });
-    }
-
+}
     // 🤖 สะพานเชื่อมแบบรวมศูนย์ตัวจริงตัวเดียว (ปรับปรุงให้รองรับ JavaScript เรียกใช้งานได้ชัวร์)
     public class WebAppInterface {
         Context mContext;
