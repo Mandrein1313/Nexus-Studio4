@@ -346,6 +346,27 @@ private void setupLogic() {
     codeEditor.setUndoEnabled(true);
     codeEditor.setHighlightCurrentBlock(true);
 
+    // ========== โหลด Android API Indexer สำหรับระบบช่วยเติมโค้ด ==========
+    new com.dev.ministudio.completion.AndroidApiIndexer(this).loadAsync(
+            new com.dev.ministudio.completion.AndroidApiIndexer.Callback() {
+                @Override
+                public void onReady(
+                        java.util.List<com.dev.ministudio.completion.AndroidApiIndexer.ApiClass> classes,
+                        boolean fromCache) {
+                    runOnUiThread(() -> {
+                        // ทดสอบครั้งแรก เอา comment ออกได้
+                        // showToast("Android API: " + classes.size()
+                        //         + (fromCache ? " (cache)" : " (สแกนใหม่)"));
+                    });
+                }
+
+                @Override
+                public void onError(String message) {
+                    // ไม่มี android.jar ก็เงียบได้
+                }
+            });
+    // ==============================================================
+
     // Auto-Save + รีเฟรช Preview (ไม่มี AI suggestion แล้ว)
     codeEditor.subscribeEvent(ContentChangeEvent.class, (event, unsubscribe) -> {
         if (tvSaveStatus != null) {
@@ -451,6 +472,7 @@ private void setupLogic() {
         setEditorActiveState(false);
     }
 }
+
 
 private void showColorPreviewIfNeeded() {
     if (codeEditor == null || codeEditor.getCursor() == null || tvSaveStatus == null) {
