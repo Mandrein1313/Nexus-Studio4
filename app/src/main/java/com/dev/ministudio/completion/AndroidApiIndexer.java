@@ -99,6 +99,7 @@ public class AndroidApiIndexer {
 
     /**
      * โหลดแบบ sync (เรียกจาก background เท่านั้น)
+     * ลำดับ: memory → sdcard cache → assets → สแกน jar
      */
     public List<ApiClass> loadSync() throws Exception {
         if (cachedList != null && !cachedList.isEmpty()) {
@@ -109,7 +110,6 @@ public class AndroidApiIndexer {
                 return cachedList;
             }
             if (loading) {
-                // รอแบบง่าย
                 while (loading) {
                     try {
                         AndroidApiIndexer.class.wait(100);
@@ -121,26 +121,57 @@ public class AndroidApiIndexer {
             }
             loading = true;
             try {
-                File cacheFile = new File(DEFAULT_CACHE);
-                File jarFile = new File(DEFAULT_JAR);
-
                 List<ApiClass> list = null;
+                File cacheFile = new File(DEFAULT_CACHE);
+
+                // 1) cache บน sdcard
                 if (cacheFile.exists() && cacheFile.length() > 100) {
                     list = readCache(cacheFile);
                 }
+
+                // 2) assets ใน APK (ผู้ใช้ทั่วไป)
                 if (list == null || list.isEmpty()) {
-                    if (!jarFile.exists()) {
-                        throw new Exception("ไม่พบ android.jar ที่ " + DEFAULT_JAR);
-                    }
-                    list = scanJar(jarFile);
-                    writeCache(cacheFile, list);
+                    list = readFromAssets();
                 }
+
+                // 3) สแกน jar บนเครื่อง (ถ้ามี)
+                if (list == null || list.isEmpty()) {
+                    File jarFile = new File(DEFAULT_JAR);
+                    if (jarFile.exists()) {
+                        list = scanJar(jarFile);
+                        writeCache(cacheFile, list);
+                    }
+                }
+
+                if (list == null || list.isEmpty()) {
+                    throw new Exception("ไม่พบ Android API index (assets / jar)");
+                }
+
                 cachedList = Collections.unmodifiableList(list);
                 return cachedList;
             } finally {
                 loading = false;
                 AndroidApiIndexer.class.notifyAll();
             }
+        }
+    }
+
+    private List<ApiClass> readFromAssets() {
+        try {
+            java.io.InputStream in = context.getAssets().open("android-api-index.txt");
+            List<ApiClass> out = new ArrayList<>();
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    out.add(new ApiClass(line));
+                }
+            }
+            return out.isEmpty() ? null : out;
+        } catch (Exception e) {
+            return null;
         }
     }
 
