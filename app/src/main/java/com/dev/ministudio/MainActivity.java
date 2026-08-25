@@ -327,7 +327,7 @@ private void setupLogic() {
 
     if (codeEditor == null) return;
 
-    codeEditor.setEditorLanguage(new JavaLanguage());
+    codeEditor.setEditorLanguage(new com.dev.ministudio.completion.NexusJavaLanguage());
 
     // โหลดธีมจากหน้า Projects
     SharedPreferences appPrefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
